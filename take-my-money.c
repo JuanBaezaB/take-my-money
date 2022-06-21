@@ -64,5 +64,5 @@ int main(int argc, char **argv) {
         free(req.buffer);        
     }
 
-    curl_easy_cleanup(curl);
+    
 }
