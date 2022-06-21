@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
     //Envía el mensaje
     printf("<<Client>>: ");
     //scanf("%s",mensaje);
-    fgets(mensaje);
+    fgets(mensaje, sizeof mensaje, stdin);
     if(send(puerto_id,mensaje, strlen(mensaje)+1, 0) == -1) {
       printf("ERROR al enviar el mensaje del cliente al servidor\n");
       close(puerto_id);
