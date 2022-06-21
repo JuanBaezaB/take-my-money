@@ -37,6 +37,10 @@ int main(int argc, char **argv) {
     CURLcode res;
     curl = curl_easy_init();
 
+    struct json_object *parsed_json;
+    struct json_object *result;
+    
+
     get_request req = {.buffer = NULL, .len = 0, .buflen = 0};
 
     if (curl) {
@@ -59,8 +63,15 @@ int main(int argc, char **argv) {
 
         printf("Total received bytes: %zu\n", req.len);
         printf("Received data:\n %s\n", req.buffer);
-        free(req.buffer);        
+
+        parsed_json = json_tokener_parse(req.buffer);
+        json_object_object_get_ex(parsed_json, "result", &result);
+        printf("result: %s\n", json_object_get_string(result));
+
+        free(req.buffer);      
+        
+          
     }
 
-    
+    curl_easy_cleanup(curl);
 }
