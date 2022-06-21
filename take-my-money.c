@@ -59,7 +59,8 @@ int main(int argc, char **argv) {
 
         printf("Total received bytes: %zu\n", req.len);
         printf("Received data:\n %s\n", req.buffer);
-        printf("%s",res);
+        String x = req.buffer;
+        printf("%s",x);
         free(req.buffer);        
     }
 
