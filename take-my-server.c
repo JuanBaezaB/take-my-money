@@ -13,6 +13,7 @@
 #include <curl/curl.h>
 #include <json-c/json.h>
 
+// Estructura de destino de respuesta de la API
 typedef struct {
     unsigned char *buffer;
     size_t len;
@@ -21,9 +22,9 @@ typedef struct {
 
 #define MAX_CONN 100     //Nº máximo de conexiones en espera
 #define MAX_TAM_MENSAJE 512 //Numero de caracteres maximo del mensaje
-#define CHUNK_SIZE 2048
+#define CHUNK_SIZE 2048 // Nº de kilobytes en los que aumenta nuestra memoria
 
-// para usar la api
+// **NO BORRAR** estructura nuestra memoria conforme necesitemos alojar mas datos
 size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
 {
     size_t realsize = size * nmemb; 
@@ -42,7 +43,6 @@ size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
 
     return realsize;
 }
-// fin para usar la api
 
 int puerto_id, coneccion_id;
 
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
     }
     printf("***Servidor se conecto con el cliente: %d.\n",destino_dir.sin_addr.s_addr);
     do {
-      //Recibe el mensaje del cliente
+      // Recibe el mensaje del cliente
       if (recv(coneccion_id, mensaje_entrada, sizeof(mensaje_entrada), 0) == -1) {
         perror("Error en recv");
         close(coneccion_id);
@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_SUCCESS);
       } else
 			   printf("<<Client envía >>: %s\n", mensaje_entrada);
-         // Inicio api
+         // Inicio API
           CURL *curl;
           CURLcode res;
           curl = curl_easy_init();
@@ -131,14 +131,13 @@ int main(int argc, char *argv[]) {
           struct json_object *result;
           char valor[100] = "", convertir[100] = "", convertido[100] = "", respuesta[1000] = "", ans[1000] = "";
 
-          //separar string
+          // Guardar el string recibido en 3 string distintos
           int i=0, j=0, ctr=0;
           for(i=0;i<(strlen(mensaje_entrada))-1;i++)
           {
               // if space or NULL found, assign NULL into newString[ctr]
               if(mensaje_entrada[i]==' '||mensaje_entrada[i]=='\0')
               {
-                  
                   ctr++;  //for next word
                   j=0;    //for next word, init index to 0
               }
@@ -154,25 +153,17 @@ int main(int argc, char *argv[]) {
                   j++;
               }
           }
+          // Concatenar la API con los string conseguidos anteriormente 
           strcat(respuesta, "https://api.apilayer.com/exchangerates_data/convert?to=");
           strcat(respuesta, convertido);
           strcat(respuesta, "&from=");
           strcat(respuesta, convertir);
           strcat(respuesta, "&amount=");
           strcat(respuesta, valor);
-          // strncpy(ans, strchr(respuesta, 'h'), strlen(respuesta)-1);
-          //fin separar string
-          // printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaa\n");
-
           get_request req = {.buffer = NULL, .len = 0, .buflen = 0};
-
           if (curl) {
               curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
-              // printf("%s", ans);
-              // curl_easy_setopt(curl, CURLOPT_URL, "https://api.apilayer.com/exchangerates_data/convert?to=CLP&from=ARS&amount=879");
-              printf("Respuesta: %s\n", respuesta);
-              curl_easy_setopt(curl, CURLOPT_URL, respuesta);
-              printf("Si pasa\n");
+              curl_easy_setopt(curl, CURLOPT_URL, respuesta); // consulta a la API con nuestra cadena "respuesta"
               curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
               curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, "https");
               struct curl_slist *headers = NULL;
@@ -188,15 +179,12 @@ int main(int argc, char *argv[]) {
               res = curl_easy_perform(curl);
 
               parsed_json = json_tokener_parse(req.buffer);
-              json_object_object_get_ex(parsed_json, "result", &result);
+              json_object_object_get_ex(parsed_json, "result", &result); // Rescate del valor "result" del JSON dado por la API, guardado en la variable del mismo nombre
               printf("result: %s\n", json_object_get_string(result));
               free(req.buffer);      
-              
-                
           }
-
           curl_easy_cleanup(curl);
-         // Fin api
+         // Fin API
 
       //Envia el mensaje al cliente
 		  sprintf(mensaje_salida, "El mensaje recibido fue --- %s ---.",json_object_get_string(result));
