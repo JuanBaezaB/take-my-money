@@ -66,7 +66,9 @@ int main(int argc, char **argv) {
 
         parsed_json = json_tokener_parse(req.buffer);
         json_object_object_get_ex(parsed_json, "result", &result);
-        printf("result: %s\n", json_object_get_string(result));
+
+        String x = json_object_get_string(result);
+        printf("result: %s\n",x);
 
         free(req.buffer);      
         
