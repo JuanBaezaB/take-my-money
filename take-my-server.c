@@ -11,11 +11,38 @@
 #include <arpa/inet.h>
 /*API*/
 #include <curl/curl.h>
+#include <json-c/json.h>
 
-
+typedef struct {
+    unsigned char *buffer;
+    size_t len;
+    size_t buflen;
+} get_request;
 
 #define MAX_CONN 100     //Nº máximo de conexiones en espera
 #define MAX_TAM_MENSAJE 512 //Numero de caracteres maximo del mensaje
+#define CHUNK_SIZE 2048
+
+// para usar la api
+size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
+{
+    size_t realsize = size * nmemb; 
+    get_request *req = (get_request *) userdata;
+
+    printf("receive chunk of %zu bytes\n", realsize);
+
+    while (req->buflen < req->len + realsize + 1)
+    {
+        req->buffer = realloc(req->buffer, req->buflen + CHUNK_SIZE);
+        req->buflen += CHUNK_SIZE;
+    }
+    memcpy(&req->buffer[req->len], ptr, realsize);
+    req->len += realsize;
+    req->buffer[req->len] = 0;
+
+    return realsize;
+}
+// fin para usar la api
 
 int puerto_id, coneccion_id;
 
@@ -30,28 +57,6 @@ void catch(int sig)
   close(puerto_id);
   printf("***Servicio cerrado.\n");
   exit(EXIT_SUCCESS);
-}
-
-String get-money(int val, String from, String to){
-    char str[100];
-    String value;
-	itoa (val, value, 10);
-    CURL *curl;
-    CURLcode res;
-    curl = curl_easy_init();
-    if(curl) {
-        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
-        curl_easy_setopt(curl, CURLOPT_URL, "https://api.apilayer.com/exchangerates_data/convert?to="+to+"&from="+from+"&amount=8");
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, "https");
-        struct curl_slist *headers = NULL;
-        headers = curl_slist_append(headers, "apikey: 9COfh6HcQz1tPC6M67W17Eqz1wv6r0vq");
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-        res = curl_easy_perform(curl);
-    }
-    curl_easy_cleanup(curl);
-    return 0;
 }
 
 /**********************************************************/
@@ -118,16 +123,90 @@ int main(int argc, char *argv[]) {
         exit(EXIT_SUCCESS);
       } else
 			   printf("<<Client envía >>: %s\n", mensaje_entrada);
+         // Inicio api
+          CURL *curl;
+          CURLcode res;
+          curl = curl_easy_init();
+          struct json_object *parsed_json;
+          struct json_object *result;
+          char valor[100] = "", convertir[100] = "", convertido[100] = "", respuesta[1000] = "", ans[1000] = "";
+
+          //separar string
+          int i=0, j=0, ctr=0;
+          for(i=0;i<(strlen(mensaje_entrada))-1;i++)
+          {
+              // if space or NULL found, assign NULL into newString[ctr]
+              if(mensaje_entrada[i]==' '||mensaje_entrada[i]=='\0')
+              {
+                  
+                  ctr++;  //for next word
+                  j=0;    //for next word, init index to 0
+              }
+              else
+              {
+                  if(ctr == 0){
+                      valor[j] = mensaje_entrada[i];
+                  }else if(ctr == 1){
+                      convertir[j] = mensaje_entrada[i];
+                  }else if(ctr == 2){
+                      convertido[j] = mensaje_entrada[i];
+                  }
+                  j++;
+              }
+          }
+          strcat(respuesta, "https://api.apilayer.com/exchangerates_data/convert?to=");
+          strcat(respuesta, convertido);
+          strcat(respuesta, "&from=");
+          strcat(respuesta, convertir);
+          strcat(respuesta, "&amount=");
+          strcat(respuesta, valor);
+          // strncpy(ans, strchr(respuesta, 'h'), strlen(respuesta)-1);
+          //fin separar string
+          // printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaa\n");
+
+          get_request req = {.buffer = NULL, .len = 0, .buflen = 0};
+
+          if (curl) {
+              curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
+              // printf("%s", ans);
+              // curl_easy_setopt(curl, CURLOPT_URL, "https://api.apilayer.com/exchangerates_data/convert?to=CLP&from=ARS&amount=879");
+              printf("Respuesta: %s\n", respuesta);
+              curl_easy_setopt(curl, CURLOPT_URL, respuesta);
+              printf("Si pasa\n");
+              curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+              curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, "https");
+              struct curl_slist *headers = NULL;
+              headers = curl_slist_append(headers, "apikey: 9COfh6HcQz1tPC6M67W17Eqz1wv6r0vq");
+              curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+              req.buffer = malloc(CHUNK_SIZE);
+              req.buflen = CHUNK_SIZE;
+
+              curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+              curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&req);
+
+              res = curl_easy_perform(curl);
+
+              parsed_json = json_tokener_parse(req.buffer);
+              json_object_object_get_ex(parsed_json, "result", &result);
+              printf("result: %s\n", json_object_get_string(result));
+              free(req.buffer);      
+              
+                
+          }
+
+          curl_easy_cleanup(curl);
+         // Fin api
 
       //Envia el mensaje al cliente
-		  sprintf(mensaje_salida, "El mensaje recibido fue --- %s ---.",mensaje_entrada);
+		  sprintf(mensaje_salida, "El mensaje recibido fue --- %s ---.",json_object_get_string(result));
 		  if (send(coneccion_id, strcat(mensaje_salida,"\0"), strlen(mensaje_salida)+1, 0) == -1) {
         perror("Error en send");
         close(coneccion_id);
         close(puerto_id);
         exit(EXIT_SUCCESS);
       } else
-        printf("<<Server replica>>: %s\n", mensaje_salida);
+        printf("<<Server replica>>: %s\n", json_object_get_string(result));
     }while(strcmp(mensaje_entrada,"terminar();") != 0);
 
     //Cierra la conexión con el cliente actual
