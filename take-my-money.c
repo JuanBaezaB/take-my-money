@@ -1,6 +1,7 @@
 #include <curl/curl.h>
 #include <stdio.h>
 #include <json-c/json.h>
+#include <stdlib.h>
 #include <string.h>
 
 
